@@ -1,10 +1,15 @@
 package modapi
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
+
+	_ "embed"
 )
 
 func joinpath(parts ...string) string {
@@ -14,6 +19,11 @@ func joinpath(parts ...string) string {
 func pathbase(path string) string {
 	s := strings.Split(path, string(os.PathSeparator))
 	return s[len(s)-1]
+}
+
+func pathUnbase(path string) string {
+	s := strings.Split(path, string(os.PathSeparator))
+	return strings.Join(s[:len(s)-1], string(os.PathSeparator))
 }
 
 /*
@@ -64,9 +74,7 @@ func createDirIfNotExists(path string) error {
 	if ok, err := doesFileExist(path); err != nil {
 		return err
 	} else if !ok {
-		enabledMods, err := os.Create(path)
-		enabledMods.Close()
-		if err != nil {
+		if err = os.Mkdir(path, os.ModeDir); err != nil {
 			return err
 		}
 	}
@@ -80,6 +88,24 @@ func formatModName(name string, enabled bool) string {
 	}
 
 	return "[DISABLED] " + name
+}
+
+func shellOut(command string, args ...string) (string, error) {
+	var stdout, stderr bytes.Buffer
+
+	cmd := exec.Command(command, args...)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+
+	if stderr.String() != "" {
+		return "", errors.New(stderr.String())
+	}
+
+	return stdout.String(), nil
 }
 
 func VerifyJeffFolder(home string) error {
@@ -121,18 +147,12 @@ func InitJeffFolder(home string) error {
 	}
 
 	if !ok {
-		conf, err := os.Create(configf)
-		defer conf.Close()
-		if err != nil {
-			return err
-		}
-
 		rivalsPath, err := ResolveRivalsPath()
 		if err != nil {
 			return err
 		}
 
-		_, err = conf.WriteString(fmt.Sprintf(`rivalsPath = '%s'`, rivalsPath))
+		err = os.WriteFile(configf, []byte(fmt.Sprintf(`rivalsPath = '%s'`, rivalsPath)), 0o666)
 		if err != nil {
 			return err
 		}
@@ -143,13 +163,18 @@ func InitJeffFolder(home string) error {
 		}
 	}
 
-	modsf := joinpath(jefff, "mods")
+	err = createDirIfNotExists(joinpath(jefff, "mods"))
+	if err != nil {
+		return err
+	}
 
-	ok, err = doesFileExist(modsf)
+	hiddenf := joinpath(jefff, hiddenFile)
+
+	ok, err = doesFileExist(hiddenf)
 	if err != nil {
 		return err
 	} else if !ok {
-		if err = os.Mkdir(modsf, os.ModeDir); err != nil {
+		if err = os.WriteFile(hiddenf, []byte{}, 0o666); err != nil {
 			return err
 		}
 	}

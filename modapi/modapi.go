@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"slices"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -17,7 +18,10 @@ const (
 	rivalsFolderName = "MarvelRivals"
 	jeffFolder       = "jeffmm"
 	configFile       = "config.toml"
+	hiddenFile       = "hidden.txt"
 	paksSubpath      = `MarvelGame\Marvel\Content\Paks`
+
+	lineEnding = "\r\n"
 )
 
 type ModHandler struct {
@@ -71,7 +75,7 @@ func (mh ModHandler) storeAlreadyLoaded() error {
 	}
 
 	for _, mod := range mods {
-		if err := mh.InstallMod(mh.PathOfLoaded(mod), true); err != nil {
+		if err := mh.InstallMod(mh.PathOfLoaded(mod), true, false); err != nil {
 			return err
 		}
 	}
@@ -115,9 +119,10 @@ func (mh ModHandler) GetMods() ([]string, error) {
 	return entries, nil
 }
 
-func (mh ModHandler) InstallMods(ignoreIfExists bool, modpaths ...string) error {
-	for _, mp := range modpaths {
-		if err := mh.InstallMod(mp, ignoreIfExists); err != nil {
+/*
+func (mh ModHandler) RepackMods(printProcess bool, modpaths ...string) error {
+	for _, path := range modpaths {
+		if err := mh.RepackMod(path, printProcess); err != nil {
 			return err
 		}
 	}
@@ -125,14 +130,75 @@ func (mh ModHandler) InstallMods(ignoreIfExists bool, modpaths ...string) error 
 	return nil
 }
 
-func (mh ModHandler) InstallReader(name string, r io.Reader, ignoreIfExists bool) error {
+func (mh ModHandler) RepackMod(modpath string, printProcess bool) error {
+	repakPath := joinpath(pathUnbase(os.Args[0]), "repak.exe")
+
+	ok, err := doesFileExist(repakPath)
+	if err != nil {
+		return err
+	} else if ok {
+		goto alreadyExists
+	}
+
+	err = os.WriteFile(repakPath, repakExecutable, 0o666)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		os.Remove(repakPath)
+	}()
+
+alreadyExists:
+
+	if printProcess {
+		fmt.Println("unpacking...")
+	}
+
+	_, err = shellOut(repakPath, "unpack", modpath)
+	if err != nil {
+		return err
+	}
+
+	if printProcess {
+		fmt.Println("repacking...")
+	}
+
+	if printProcess {
+		fmt.Println("deleting old folder...")
+	}
+
+	_, err = shellOut(repakPath, "pack", strings.Split(modpath, ".")[0])
+	if err != nil {
+		return err
+	}
+
+	if printProcess {
+		fmt.Println("finished process")
+	}
+
+	return os.RemoveAll(strings.Split(modpath, ".")[0])
+}
+*/
+
+func (mh ModHandler) InstallMods(overwriteIfExists, printInstalls bool, modpaths ...string) error {
+	for _, mp := range modpaths {
+		if err := mh.InstallMod(mp, overwriteIfExists, printInstalls); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (mh ModHandler) InstallReader(name string, r io.Reader, overwriteIfExists bool) error {
 	content, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
 
 	fl := os.O_RDWR | os.O_CREATE
-	if !ignoreIfExists {
+	if overwriteIfExists {
 		fl |= os.O_TRUNC
 	}
 
@@ -146,11 +212,11 @@ func (mh ModHandler) InstallReader(name string, r io.Reader, ignoreIfExists bool
 	return err
 }
 
-func (mh ModHandler) InstallMod(modpath string, ignoreIfExists bool) error {
+func (mh ModHandler) InstallMod(modpath string, overwriteIfExists, printInstalls bool) error {
 	modpath = path.Clean(modpath)
 	ext := path.Ext(modpath)
 
-	if ext == ".zip" {
+	if ext == ".zip" || ext == ".rar" {
 		z, err := zip.OpenReader(modpath)
 		defer z.Close()
 		if err != nil {
@@ -166,9 +232,13 @@ func (mh ModHandler) InstallMod(modpath string, ignoreIfExists bool) error {
 					return err
 				}
 
-				err = mh.InstallReader(f.Name, fr, ignoreIfExists)
+				err = mh.InstallReader(f.Name, fr, overwriteIfExists)
 				if err != nil {
 					return err
+				}
+
+				if printInstalls {
+					fmt.Printf("installed '%s'\n", f.Name)
 				}
 			}
 		}
@@ -179,7 +249,14 @@ func (mh ModHandler) InstallMod(modpath string, ignoreIfExists bool) error {
 			return err
 		}
 
-		return mh.InstallReader(pathbase(modpath), pakr, ignoreIfExists)
+		err = mh.InstallReader(pathbase(modpath), pakr, overwriteIfExists)
+		if err != nil {
+			return err
+		}
+
+		if printInstalls {
+			fmt.Printf("installed '%s'\n", pathbase(modpath))
+		}
 	} else {
 		return fmt.Errorf("'%s' is not an installable file", pathbase(modpath))
 	}
@@ -264,4 +341,73 @@ func (mh ModHandler) DisableMods(names ...string) error {
 
 func (mh ModHandler) DisableMod(name string) error {
 	return os.Remove(mh.PathOfLoaded(name))
+}
+
+func (mh ModHandler) openHidden() (*os.File, error) {
+	return os.OpenFile(joinpath(mh.homePath, jeffFolder, hiddenFile), os.O_RDWR|os.O_TRUNC, 0o666)
+}
+
+func (mh ModHandler) HideMod(name string) error {
+	hiddenf, err := mh.openHidden()
+	defer hiddenf.Close()
+	if err != nil {
+		return err
+	}
+
+	content, err := io.ReadAll(hiddenf)
+	if err != nil {
+		return err
+	}
+
+	_, err = hiddenf.Write([]byte(strings.Join(append(strings.Split(string(content), lineEnding), name), lineEnding)))
+	return err
+}
+
+func (mh ModHandler) HideMods(names ...string) error {
+	for _, name := range names {
+		if err := mh.HideMod(name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (mh ModHandler) UnhideMod(name string) error {
+	hiddenf, err := mh.openHidden()
+	defer hiddenf.Close()
+	if err != nil {
+		return err
+	}
+
+	content, err := io.ReadAll(hiddenf)
+	if err != nil {
+		return err
+	}
+
+	hiddenMods := strings.Split(string(content), lineEnding)
+
+	if i := slices.Index(hiddenMods, name); i != -1 {
+		hiddenMods = slices.Delete(hiddenMods, i, i)
+	} else {
+		return fmt.Errorf("the mod '%s' is not hidden", name)
+	}
+
+	_, err = hiddenf.Write([]byte(strings.Join(hiddenMods, lineEnding)))
+	return err
+}
+
+func (mh ModHandler) UnhideMods(names ...string) error {
+	for _, name := range names {
+		if err := mh.UnhideMod(name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (mh ModHandler) GetHidden() ([]string, error) {
+	content, err := os.ReadFile(joinpath(mh.homePath, jeffFolder, hiddenFile))
+	return strings.Split(string(content), lineEnding), err
 }
