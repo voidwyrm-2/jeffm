@@ -5,7 +5,6 @@ package modapi
 import (
 	"errors"
 	"fmt"
-	"path"
 	"syscall"
 )
 
@@ -14,18 +13,29 @@ const (
 	steamCommonPathB = `SteamLibrary\steamapps\common`
 )
 
-func ResolveHastePath() (string, error) {
+func ResolveRivalsPath() (string, error) {
 	drives, err := getDrives()
 	if err != nil {
 		return "", err
 	}
 
+	fmt.Println(drives)
+
 	for _, d := range drives {
-		p := path.Join(d+":", steamCommonPathA, mrFolderName)
-		if ok, err := doesFileExist(p); err != nil {
+		d += ":"
+
+		pathA := joinpath(d, steamCommonPathA, rivalsFolderName)
+		if ok, err := doesFileExist(pathA); err != nil {
 			return "", err
 		} else if ok {
-			return p, nil
+			return pathA, nil
+		}
+
+		pathB := joinpath(d, steamCommonPathB, rivalsFolderName)
+		if ok, err := doesFileExist(pathB); err != nil {
+			return "", err
+		} else if ok {
+			return pathB, nil
 		}
 	}
 

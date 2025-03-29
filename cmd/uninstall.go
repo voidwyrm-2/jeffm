@@ -4,16 +4,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var installCmd = &cobra.Command{
-	Use:   "install",
-	Short: "Installs the given mods",
+var uninstallCmd = &cobra.Command{
+	Use:   "uninstall",
+	Short: "Uninstalls the given mods",
 	Long:  ``,
 	Args:  cobra.RangeArgs(1, 100),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return modHandler.InstallMods(false, args...)
+		return modHandler.UninstallMods(args...)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(installCmd)
+	rootCmd.AddCommand(uninstallCmd)
 }

@@ -18,11 +18,13 @@ var listCmd = &cobra.Command{
 			return err
 		}
 
+		fmt.Printf("%d mods currently installed:\n", len(mods))
+
 		for _, m := range mods {
-			if strings.HasPrefix(m.String(), "[ENABLED]") {
-				fmt.Println("\033[92m" + m.String() + "\033[0m")
+			if strings.HasPrefix(m, "[ENABLED]") {
+				fmt.Println("\033[92m" + m + "\033[0m")
 			} else {
-				fmt.Println("\033[91m" + m.String() + "\033[0m")
+				fmt.Println("\033[91m" + m + "\033[0m")
 			}
 		}
 

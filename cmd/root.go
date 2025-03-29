@@ -14,29 +14,20 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "Rush",
-	Short: "Rush is a terminal-based mod manager for Haste: Broken Worlds",
+	Use:   "jeffm",
+	Short: "JeffM is a terminal-based mod manager for Marvel Rivals",
 	Long:  ``,
 }
 
 func Execute(_version string) error {
 	version = _version
 
-	hh, err := modapi.NewHomeHandler()
+	_modHandler, err := modapi.NewModHandler()
 	if err != nil {
 		return err
 	}
 
-	err = hh.VerifyRushFolder()
-	if err != nil {
-		return err
-	}
-
-	modHandler, err = modapi.NewModHandler(hh)
-	defer modHandler.Close()
-	if err != nil {
-		return err
-	}
+	modHandler = _modHandler
 
 	err = rootCmd.Execute()
 	if err != nil {
