@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/voidwyrm-2/jeffm/cmd/profile"
 	"github.com/voidwyrm-2/jeffm/modapi"
 )
 
@@ -38,4 +39,5 @@ func Execute(_version string) error {
 }
 
 func init() {
+	rootCmd.AddCommand(profile.Profile(&modHandler))
 }

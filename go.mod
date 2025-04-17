@@ -4,6 +4,7 @@ go 1.22.5
 
 require (
 	github.com/BurntSushi/toml v1.5.0
+	github.com/gen2brain/go-unarr v0.2.4
 	github.com/spf13/cobra v1.9.1
 )
 

@@ -5,6 +5,7 @@ package modapi
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"syscall"
 )
 
@@ -19,19 +20,17 @@ func ResolveRivalsPath() (string, error) {
 		return "", err
 	}
 
-	fmt.Println(drives)
-
 	for _, d := range drives {
 		d += ":"
 
-		pathA := joinpath(d, steamCommonPathA, rivalsFolderName)
+		pathA := filepath.Join(d, steamCommonPathA, rivalsFolderName)
 		if ok, err := doesFileExist(pathA); err != nil {
 			return "", err
 		} else if ok {
 			return pathA, nil
 		}
 
-		pathB := joinpath(d, steamCommonPathB, rivalsFolderName)
+		pathB := filepath.Join(d, steamCommonPathB, rivalsFolderName)
 		if ok, err := doesFileExist(pathB); err != nil {
 			return "", err
 		} else if ok {
